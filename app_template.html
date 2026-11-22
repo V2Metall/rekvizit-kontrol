@@ -1,0 +1,414 @@
+<title>Реквизит-контроль</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Макет: рабочее место бухгалтера — слева карточка запроса, справа заключение; ведомость тестов отдельной вкладкой. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --sunk:#f6f8fa; --ink:#15202b; --muted:#5a6774; --line:#d6dde4;
+  --accent:#1d5f8a; --accent-ink:#ffffff; --accent-soft:#e3eef6;
+  --ok:#2c7a4b; --ok-soft:#e2f2e8; --warn:#9a6412; --warn-soft:#fbf0dc; --bad:#b03636; --bad-soft:#f9e3e3;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --surface:#161e26; --sunk:#121920; --ink:#e4eaf0; --muted:#94a2af; --line:#283440;
+  --accent:#62a9d9; --accent-ink:#0b1218; --accent-soft:#1a2e3d;
+  --ok:#55b880; --ok-soft:#173226; --warn:#e2a94c; --warn-soft:#352a14; --bad:#ec7272; --bad-soft:#3a1d1d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --surface:#161e26; --sunk:#121920; --ink:#e4eaf0; --muted:#94a2af; --line:#283440;
+  --accent:#62a9d9; --accent-ink:#0b1218; --accent-soft:#1a2e3d;
+  --ok:#55b880; --ok-soft:#173226; --warn:#e2a94c; --warn-soft:#352a14; --bad:#ec7272; --bad-soft:#3a1d1d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin-bottom:16px}
+.brand h1{font-size:1.6rem;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.brand p{margin:2px 0 0;color:var(--muted);max-width:62ch}
+.tag{display:inline-block;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px}
+nav.tabs a{padding:9px 14px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
+nav.tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0}
+.panel h2{font-size:1.05rem;margin:0 0 12px}
+.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+@media (max-width:520px){.row{grid-template-columns:1fr}}
+label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:3px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+textarea{min-height:120px;resize:vertical}
+.mono,input.mono{font-family:var(--f-mono);font-size:.88rem;font-variant-numeric:tabular-nums}
+.field{min-width:0}
+.stack{display:flex;flex-direction:column;gap:12px}
+.sample{display:flex;gap:8px;align-items:end;flex-wrap:wrap;padding:12px;background:var(--accent-soft);border-radius:6px}
+.sample .field{flex:1 1 260px}
+button{font:inherit;cursor:pointer;border-radius:6px;padding:9px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:500}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+.vcard{font-size:.85rem;background:var(--sunk);border:1px dashed var(--line);border-radius:6px;padding:10px 12px;color:var(--muted)}
+.vcard b{color:var(--ink);font-weight:600}
+.vcard .mono{color:var(--ink)}
+.err{color:var(--bad);font-size:.88rem;min-height:1.2em}
+/* заключение */
+.verdict{border-radius:var(--r);padding:14px 16px;border:1px solid var(--line);background:var(--sunk)}
+.verdict.low{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+.verdict.mid{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.verdict.high{background:var(--bad-soft);border-color:color-mix(in srgb,var(--bad) 35%,transparent)}
+.vhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.vname{font-size:1.25rem;font-weight:700}
+.low .vname{color:var(--ok)} .mid .vname{color:var(--warn)} .high .vname{color:var(--bad)}
+.score{font-family:var(--f-mono);font-size:1.6rem;font-weight:500;font-variant-numeric:tabular-nums}
+.score small{font-size:.8rem;color:var(--muted)}
+.scale{position:relative;height:10px;border-radius:5px;margin:10px 0 4px;background:linear-gradient(90deg,var(--ok) 0 25%,var(--warn) 25% 50%,var(--bad) 50% 100%);opacity:.85}
+.pin{position:absolute;top:-4px;width:4px;height:18px;border-radius:2px;background:var(--ink);transform:translateX(-2px)}
+.ticks{position:relative;height:1.1em;font-size:.72rem;color:var(--muted);font-family:var(--f-mono)}.ticks span{position:absolute;transform:translateX(-50%)}.ticks span:first-child{transform:none}.ticks span:last-child{right:0;transform:none}
+.action{margin:10px 0 0;font-weight:500}
+ul.flags{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+ul.flags li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.pts{font-family:var(--f-mono);font-weight:500;text-align:center;border-radius:4px;padding:2px 0;background:var(--bad-soft);color:var(--bad)}
+.pts.s{background:var(--warn-soft);color:var(--warn)}
+.ftitle{font-weight:600}
+.fdet{font-size:.86rem;color:var(--muted);overflow-wrap:anywhere}
+.src{font-family:var(--f-mono);font-size:.72rem;color:var(--accent)}
+.notes{margin:12px 0 0;padding-left:18px;color:var(--muted);font-size:.86rem}
+.check h3{font-size:.95rem;margin:16px 0 8px}
+.check label{display:flex;gap:8px;align-items:flex-start;font-size:.9rem;color:var(--ink);margin:0 0 6px}
+.check input{width:auto;margin-top:4px}
+.decide{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.decide button.hold{border-color:var(--warn);color:var(--warn)}
+.decide button.okb{border-color:var(--ok);color:var(--ok)}
+.decide button.rej{border-color:var(--bad);color:var(--bad)}
+.toast{font-size:.86rem;color:var(--muted);min-height:1.3em;margin-top:6px}
+.log{margin-top:14px;font-size:.84rem}
+.log table{width:100%;border-collapse:collapse}
+.log td{border-top:1px solid var(--line);padding:5px 4px;vertical-align:top}
+/* ведомость */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;min-width:0}
+.tile .k{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile .v{font-family:var(--f-mono);font-size:1.6rem;font-variant-numeric:tabular-nums}
+.tile .t{font-size:.82rem}
+.pass{color:var(--ok)} .fail{color:var(--bad)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table.data{width:100%;border-collapse:collapse;font-size:.88rem;min-width:720px}
+table.data th{text-align:left;font-weight:600;color:var(--muted);font-size:.76rem;text-transform:uppercase;letter-spacing:.05em;padding:9px 10px;border-bottom:1px solid var(--line);background:var(--sunk)}
+table.data td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.data tr:last-child td{border-bottom:0}
+table.data td.num{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:.76rem;border-radius:99px;padding:1px 8px;font-weight:600;white-space:nowrap}
+.pill.low{background:var(--ok-soft);color:var(--ok)} .pill.mid{background:var(--warn-soft);color:var(--warn)} .pill.high{background:var(--bad-soft);color:var(--bad)}
+.pill.fraud{background:var(--bad-soft);color:var(--bad)} .pill.legit{background:var(--ok-soft);color:var(--ok)}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer;font-weight:500}
+.controls{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;margin-bottom:14px}
+.controls input[type=range]{width:220px;padding:0}
+.cm{display:grid;grid-template-columns:auto repeat(2,minmax(0,1fr));gap:4px;font-size:.86rem;max-width:420px}
+.cm div{padding:8px;border-radius:4px;background:var(--sunk);text-align:center}
+.cm .h{background:none;color:var(--muted);font-size:.76rem}
+.cm .g{background:var(--ok-soft);color:var(--ok);font-family:var(--f-mono);font-weight:600}
+.cm .b{background:var(--bad-soft);color:var(--bad);font-family:var(--f-mono);font-weight:600}
+.prose{max-width:72ch}
+.prose h2{font-size:1.15rem;margin:22px 0 8px}
+.prose p,.prose li{color:var(--ink)}
+.muted{color:var(--muted)}
+footer{margin-top:28px;font-size:.8rem;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.pin{transition:left .35s ease}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="tag">Учебный прототип · команда KIB-35</span>
+      <h1>Реквизит-контроль</h1>
+      <p>Проверка запроса на смену платёжных реквизитов до оплаты: красные флаги, оценка риска и порядок обратного звонка. Все компании, адреса и счета вымышлены.</p>
+    </div>
+  </header>
+  <nav class="tabs" aria-label="Разделы">
+    <a href="#check" data-tab="check">Проверка запроса</a>
+    <a href="#test" data-tab="test">Тестовый набор</a>
+    <a href="#vendors" data-tab="vendors">Справочник контрагентов</a>
+    <a href="#about" data-tab="about">Как это работает</a>
+  </nav>
+
+  <!-- ПРОВЕРКА -->
+  <section id="v-check" hidden>
+    <div class="grid">
+      <form class="panel stack" id="form" novalidate>
+        <div class="sample">
+          <div class="field">
+            <label for="sample">Загрузить пример из тестового набора</label>
+            <select id="sample"></select>
+          </div>
+          <button type="button" id="clear">Очистить форму</button>
+        </div>
+        <h2>Запрос на изменение реквизитов</h2>
+        <div class="row">
+          <div class="field">
+            <label for="vendor">Контрагент из справочника</label>
+            <select id="vendor"></select>
+          </div>
+          <div class="field">
+            <label for="channel">Как пришёл запрос</label>
+            <select id="channel">
+              <option value="email">Электронная почта</option>
+              <option value="phone">Телефонный звонок</option>
+              <option value="messenger">Мессенджер</option>
+              <option value="paper">Бумажное письмо (оригинал)</option>
+            </select>
+          </div>
+        </div>
+        <div class="vcard" id="vcard"></div>
+        <div class="row">
+          <div class="field" id="f-sender">
+            <label for="sender">Адрес отправителя</label>
+            <input id="sender" class="mono" autocomplete="off" placeholder="buh@company.test">
+          </div>
+          <div class="field">
+            <label for="phone" id="phone-label">Телефон в сообщении</label>
+            <input id="phone" class="mono" autocomplete="off" placeholder="+7 ...">
+          </div>
+        </div>
+        <div class="field">
+          <label for="text">Текст письма или запись разговора</label>
+          <textarea id="text" placeholder="Вставьте текст запроса"></textarea>
+        </div>
+        <h2>Новые реквизиты</h2>
+        <div class="row">
+          <div class="field"><label for="bank">Банк получателя</label><input id="bank" autocomplete="off"></div>
+          <div class="field"><label for="country">Страна банка</label>
+            <select id="country"><option value="RU">Россия</option><option value="KZ">Казахстан</option><option value="HK">Гонконг</option><option value="LV">Латвия</option><option value="AE">ОАЭ</option><option value="OTHER">Другая</option></select></div>
+          <div class="field"><label for="bik">БИК</label><input id="bik" class="mono" inputmode="numeric" autocomplete="off"></div>
+          <div class="field"><label for="account">Расчётный счёт / IBAN</label><input id="account" class="mono" autocomplete="off"></div>
+          <div class="field"><label for="inn">ИНН получателя</label><input id="inn" class="mono" inputmode="numeric" autocomplete="off"></div>
+          <div class="field"><label for="amount">Сумма ближайшего платежа, ₽</label><input id="amount" class="mono" inputmode="numeric" autocomplete="off"></div>
+        </div>
+        <div class="err" id="err" role="alert"></div>
+        <div><button type="submit" class="primary">Проверить запрос</button></div>
+      </form>
+
+      <div class="panel" id="result" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ТЕСТ -->
+  <section id="v-test" hidden>
+    <div class="controls">
+      <div><label for="thr">Порог «подозрительно»: <b class="mono" id="thrv">25</b> баллов</label>
+        <input type="range" id="thr" min="5" max="70" step="5" value="25"></div>
+      <p class="muted" style="margin:0;max-width:60ch">Набор из 30 синтетических запросов: 15 мошеннических, 15 законных. Цель проекта — найти не меньше 90% мошеннических при доле ложных тревог не больше 20%. Двигайте порог, чтобы увидеть компромисс.</p>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="grid" style="margin-bottom:16px">
+      <div class="panel"><h2>Матрица ошибок</h2><div class="cm" id="cm"></div></div>
+      <div class="panel"><h2>Как читать</h2><p class="muted" style="margin:0">Полнота — доля мошеннических запросов, которые инструмент отправил на проверку. Ложные тревоги — доля законных запросов, по которым он попросил перезвонить зря. Пропуск мошенничества стоит денег, ложная тревога — одного звонка, поэтому порог выбран осторожный.</p></div>
+    </div>
+    <div class="tbl"><table class="data">
+      <thead><tr><th>ID</th><th>Сценарий</th><th>Разметка</th><th style="text-align:right">Балл</th><th>Уровень</th><th>Итог</th><th>Почему так размечен</th></tr></thead>
+      <tbody id="rows"></tbody></table></div>
+  </section>
+
+  <!-- СПРАВОЧНИК -->
+  <section id="v-vendors" hidden>
+    <p class="muted prose" style="margin-top:0">Справочник — это данные, которые бухгалтер уже знает о контрагенте из договора. Новый запрос сравнивается именно с ним, а не с тем, что написано в письме.</p>
+    <div class="tbl"><table class="data">
+      <thead><tr><th>Контрагент</th><th>ИНН</th><th>Почта</th><th>Телефон из договора</th><th>Банк</th><th>БИК</th><th>Счёт</th></tr></thead>
+      <tbody id="vrows"></tbody></table></div>
+  </section>
+
+  <!-- О ПРОЕКТЕ -->
+  <section id="v-about" hidden>
+    <div class="prose">
+      <h2 style="margin-top:0">Проблема</h2>
+      <p>Бухгалтеру малого бизнеса приходит письмо или звонок: «у нас сменились реквизиты, оплатите на новый счёт». Злоумышленники пишут с похожего или взломанного адреса, звонят синтезированным голосом и торопят. Деньги уходят мошенникам, а вернуть их почти невозможно.</p>
+      <ul>
+        <li>46% малых и средних компаний сталкивались с фишингом, созданным ИИ, 29% — с мошенничеством с дипфейками (VikingCloud, 2026 SMB Threat Landscape Report, SRC-097).</li>
+        <li>Доля голосового фишинга среди способов проникновения выросла до 11% (Mandiant, M-Trends 2026, с. 3, SRC-007).</li>
+        <li>Атак на МСБ через поддельные мессенджеры и сервисы видеосвязи — 414 736 (Kaspersky, 2026 SMB threat landscape, SRC-088).</li>
+        <li>70% фишинговых сообщений маскируются под банки (CSA, Singapore Cyber Landscape 2025/2026, с. 26–28).</li>
+        <li>BEC — обманный запрос денег от имени партнёра; подлинность домена проверяется по SPF, DKIM и DMARC (KuppingerCole, Email Security, с. 7, 9, SRC-046).</li>
+      </ul>
+      <h2>Что делает прототип</h2>
+      <p>Сравнивает запрос со справочником контрагентов и ищет признаки подмены. Каждый признак даёт баллы, сумма определяет уровень риска и действие. Затем инструмент ведёт бухгалтера по процедуре обратного звонка и фиксирует решение. Внешние сервисы не используются: данные не покидают браузер.</p>
+      <div class="tbl" style="margin:10px 0"><table class="data" style="min-width:560px">
+        <thead><tr><th>Признак</th><th style="text-align:right">Баллы</th></tr></thead>
+        <tbody id="rules"></tbody></table></div>
+      <p>Уровни: до 24 баллов — низкий риск, 25–49 — требует проверки, от 50 — высокий риск. Счёт проверяется по контрольному ключу Банка России (последние три цифры БИК + номер счёта, веса 7-1-3), ИНН — по контрольной сумме ФНС.</p>
+      <h2>Ограничения</h2>
+      <ul>
+        <li>Правила подобраны командой, а тестовый набор составлен той же командой, поэтому результат на нём завышен. Нужна проверка на запросах, которые команда не видела.</li>
+        <li>Если почта контрагента взломана и мошенник не допускает других ошибок, письмо может набрать мало баллов. Поэтому смена реквизитов всегда подтверждается звонком, какой бы ни была оценка.</li>
+        <li>Прототип не проверяет SPF, DKIM и DMARC и не обращается к банковским базам: это следующий шаг.</li>
+      </ul>
+      <h2>Как подтвердить реквизиты</h2>
+      <p>Порядок взят из практик банков и производителей средств защиты: позвонить по номеру из договора, а не из письма; попросить собеседника самого назвать получателя, банк и последние цифры счёта; записать решение и при крупной сумме получить второе согласование (Bitdefender, шаблон проверки реквизитов, 03.11.2026; Commonwealth Bank, 19.10.2026).</p>
+    </div>
+  </section>
+
+  <footer>Учебный проект по дисциплине «Безопасность предпринимательской деятельности», НИУ ВШЭ, 2026. Работает только на синтетических данных.</footer>
+</div>
+
+<script>
+/*__DATA__*/
+/*__ENGINE__*/
+(function(){
+  var V = DATA.vendors, C = DATA.cases, byId = {};
+  V.forEach(function(v){ byId[v.id]=v; });
+  var $ = function(id){ return document.getElementById(id); };
+  var CH = {email:'Почта', phone:'Звонок', messenger:'Мессенджер', paper:'Бумажное письмо'};
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function fmtMoney(n){ n=+n||0; return n? n.toLocaleString('ru-RU')+' ₽':'—'; }
+
+  // --- вкладки
+  var TABS=['check','test','vendors','about'];
+  function show(){
+    var t=(location.hash||'#check').slice(1); if(TABS.indexOf(t)<0) t='check';
+    TABS.forEach(function(x){ $('v-'+x).hidden = x!==t; });
+    document.querySelectorAll('nav.tabs a').forEach(function(a){ if(a.dataset.tab===t) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+    if(t==='test') runTests();
+  }
+  window.addEventListener('hashchange', show);
+
+  // --- селекты
+  var vs=$('vendor');
+  vs.innerHTML='<option value="">— нет в справочнике —</option>'+V.map(function(v){return '<option value="'+v.id+'">'+esc(v.name)+'</option>';}).join('');
+  $('sample').innerHTML='<option value="">— выберите пример —</option>'+
+    '<optgroup label="Мошеннические">'+C.filter(function(c){return c.label==='fraud';}).map(function(c){return '<option value="'+c.id+'">'+c.id+' · '+esc(c.title)+'</option>';}).join('')+'</optgroup>'+
+    '<optgroup label="Законные">'+C.filter(function(c){return c.label==='legit';}).map(function(c){return '<option value="'+c.id+'">'+c.id+' · '+esc(c.title)+'</option>';}).join('')+'</optgroup>';
+
+  function vcard(){
+    var v=byId[vs.value];
+    $('vcard').innerHTML = v ? '<b>'+esc(v.name)+'</b> · '+esc(v.what)+'<br>ИНН <span class="mono">'+v.inn+'</span> · почта <span class="mono">'+esc(v.email||('*@'+v.domain))+'</span> · тел. <span class="mono">'+esc(v.phone)+'</span><br>'+esc(v.bankName)+' · БИК <span class="mono">'+v.bik+'</span> · счёт <span class="mono">'+v.account+'</span>'
+      : 'Получатель не выбран из справочника. Если это новый поставщик, его нужно сначала проверить и внести в справочник по договору.';
+  }
+  function channelUI(){
+    var ch=$('channel').value;
+    $('f-sender').hidden = ch!=='email';
+    $('phone-label').textContent = ch==='phone' ? 'Номер, с которого звонили' : ch==='messenger' ? 'Номер или аккаунт отправителя' : 'Телефон, указанный в сообщении';
+  }
+  vs.addEventListener('change', vcard);
+  $('channel').addEventListener('change', channelUI);
+
+  function fill(c){
+    vs.value=c.vendorId||''; $('channel').value=c.channel; $('sender').value=c.sender||''; $('phone').value=c.phoneInMessage||'';
+    $('text').value=c.text||''; $('bank').value=c.bankName||''; $('country').value=['RU','KZ','HK','LV','AE'].indexOf(c.country)>=0?c.country:'OTHER';
+    $('bik').value=c.bik||''; $('account').value=c.account||''; $('inn').value=c.recipientInn||''; $('amount').value=c.amount||'';
+    vcard(); channelUI();
+  }
+  $('sample').addEventListener('change', function(){ var c=C.filter(function(x){return x.id===this.value;},this)[0]; if(c){ fill(c); check(); } });
+  $('clear').addEventListener('click', function(){ $('form').reset(); $('sample').value=''; vcard(); channelUI(); $('err').textContent=''; renderEmpty(); });
+
+  function read(){
+    return { vendor: byId[vs.value]||null, channel:$('channel').value, sender:$('channel').value==='email'?$('sender').value:'',
+      phoneInMessage:$('phone').value, text:$('text').value, bankName:$('bank').value, country:$('country').value,
+      bik:$('bik').value, account:$('account').value, recipientInn:$('inn').value, amount:$('amount').value };
+  }
+
+  var last=null;
+  function check(){
+    var q=read();
+    var hasDetails = (q.account||'').trim() || (q.bik||'').trim();
+    if(!hasDetails && !(q.text||'').trim()){ $('err').textContent='Заполните хотя бы текст запроса или новые реквизиты — без них проверять нечего.'; return; }
+    if(q.text.length>20000){ $('err').textContent='Текст длиннее 20 000 символов: вставьте только само письмо, без пересланной переписки.'; return; }
+    $('err').textContent='';
+    var r=RK.analyze(q); last={q:q,r:r}; render(q,r);
+  }
+  $('form').addEventListener('submit', function(e){ e.preventDefault(); check(); });
+
+  function renderEmpty(){ $('result').innerHTML='<h2>Заключение</h2><p class="muted">Заполните форму или выберите пример, затем нажмите «Проверить запрос».</p>'; }
+
+  var CHECK=[
+    'Позвонил по номеру из справочника, а не из письма или звонка',
+    'Собеседник сам назвал получателя, банк и последние 4 цифры счёта — совпало',
+    'ИНН получателя совпадает с ИНН контрагента',
+    'Крупный платёж согласован вторым сотрудником (руководителем)'
+  ];
+  function render(q,r){
+    var pos=Math.min(r.score,100);
+    var h='<h2>Заключение</h2><div class="verdict '+r.level.id+'"><div class="vhead"><span class="vname">'+r.level.name+'</span><span class="score">'+r.score+' <small>баллов</small></span></div>'+
+      '<div class="scale" role="img" aria-label="Шкала риска, '+r.score+' из 100"><span class="pin" style="left:'+pos+'%"></span></div>'+
+      '<div class="ticks"><span style="left:0">0</span><span style="left:25%">25</span><span style="left:50%">50</span><span>100+</span></div>'+
+      '<p class="action">'+esc(r.level.action)+'</p></div>';
+    if(r.flags.length){
+      h+='<ul class="flags">'+r.flags.map(function(f){return '<li><span class="pts'+(f.pts<20?' s':'')+'">+'+f.pts+'</span><div><div class="ftitle">'+esc(f.title)+'</div><div class="fdet">'+esc(f.detail)+'</div>'+(f.src?'<div class="src">Основание: '+esc(f.src)+'</div>':'')+'</div></li>';}).join('')+'</ul>';
+    } else h+='<p class="muted" style="margin-top:12px">Красных флагов не найдено.</p>';
+    if(r.info.length) h+='<ul class="notes">'+r.info.map(function(i){return '<li>'+esc(i)+'</li>';}).join('')+'</ul>';
+    h+='<div class="check"><h3>Обратный звонок перед оплатой</h3>'+CHECK.map(function(t,i){return '<label><input type="checkbox" id="cb'+i+'"> '+esc(t)+'</label>';}).join('')+
+      '<div class="decide"><button type="button" class="hold" data-d="Приостановлено">Приостановить оплату</button><button type="button" class="okb" data-d="Подтверждено" id="okbtn">Реквизиты подтверждены</button><button type="button" class="rej" data-d="Отклонено">Отклонить запрос</button><button type="button" id="copy">Скопировать заключение</button></div>'+
+      '<div class="toast" id="toast"></div></div><div class="log" id="log"></div>';
+    $('result').innerHTML=h;
+    $('result').querySelectorAll('.decide button[data-d]').forEach(function(b){ b.addEventListener('click', function(){ decide(b.dataset.d); }); });
+    $('copy').addEventListener('click', copy);
+    renderLog();
+  }
+
+  // --- журнал решений
+  var LOG=[]; try{ LOG=JSON.parse(localStorage.getItem('rk-log')||'[]'); }catch(e){ LOG=[]; }
+  function decide(d){
+    if(!last) return;
+    var done=CHECK.map(function(_,i){ var el=$('cb'+i); return el&&el.checked; });
+    if(d==='Подтверждено' && !(done[0]&&done[1])){ $('toast').textContent='Чтобы подтвердить реквизиты, отметьте звонок по номеру из справочника и совпадение реквизитов.'; return; }
+    if(d==='Подтверждено' && last.r.level.id==='high' && !done[3]){ $('toast').textContent='При высоком риске нужно второе согласование: отметьте последний пункт.'; return; }
+    var v=last.q.vendor;
+    LOG.unshift({t:new Date().toLocaleString('ru-RU'), who:v?v.name:'нет в справочнике', score:last.r.score, level:last.r.level.name, d:d});
+    LOG=LOG.slice(0,20); try{ localStorage.setItem('rk-log', JSON.stringify(LOG)); }catch(e){}
+    $('toast').textContent='Решение записано в журнал: '+d.toLowerCase()+'.';
+    renderLog();
+  }
+  function renderLog(){
+    var el=$('log'); if(!el) return;
+    el.innerHTML = LOG.length ? '<h3 style="font-size:.95rem;margin:16px 0 6px">Журнал решений (в этом браузере)</h3><table>'+LOG.map(function(x){return '<tr><td class="muted">'+esc(x.t)+'</td><td>'+esc(x.who)+'</td><td class="mono">'+x.score+'</td><td>'+esc(x.d)+'</td></tr>';}).join('')+'</table>' : '';
+  }
+  function copy(){
+    if(!last) return;
+    var q=last.q, r=last.r, v=q.vendor;
+    var txt='Проверка запроса на смену реквизитов\nКонтрагент: '+(v?v.name:'нет в справочнике')+'\nКанал: '+CH[q.channel]+'\nОценка: '+r.score+' баллов — '+r.level.name+'\nДействие: '+r.level.action+'\nПризнаки:\n'+(r.flags.map(function(f){return ' +'+f.pts+' '+f.title+' — '+f.detail;}).join('\n')||' нет');
+    var done=function(){ $('toast').textContent='Заключение скопировано.'; };
+    try{ navigator.clipboard.writeText(txt).then(done,function(){ fallback(txt); }); }catch(e){ fallback(txt); }
+  }
+  function fallback(txt){
+    var ta=document.createElement('textarea'); ta.value=txt; ta.setAttribute('readonly',''); ta.style.marginTop='8px'; ta.style.minHeight='140px';
+    $('toast').textContent='Скопировать автоматически не получилось — выделите текст ниже и скопируйте вручную.'; $('toast').after(ta); ta.select();
+  }
+
+  // --- тестовый набор
+  function runTests(){
+    var thr=+$('thr').value; $('thrv').textContent=thr;
+    var rows=C.map(function(c){ var r=RK.analyze(Object.assign({},c,{vendor:byId[c.vendorId]||null})); var sus=r.score>=thr; return {c:c,r:r,sus:sus,ok:sus===(c.label==='fraud')}; });
+    var tp=rows.filter(function(x){return x.c.label==='fraud'&&x.sus;}).length, fn=15-tp;
+    var fp=rows.filter(function(x){return x.c.label==='legit'&&x.sus;}).length, tn=15-fp;
+    var rec=tp/15, fpr=fp/15, acc=(tp+tn)/30;
+    var avg=rows.filter(function(x){return x.c.label==='fraud';}).reduce(function(s,x){return s+x.r.score;},0)/15;
+    $('tiles').innerHTML=
+      tile('Полнота', Math.round(rec*100)+'%', rec>=0.9?'<span class="pass">цель ≥ 90% выполнена</span>':'<span class="fail">цель ≥ 90% не выполнена</span>', tp+' из 15 мошеннических')+
+      tile('Ложные тревоги', Math.round(fpr*100)+'%', fpr<=0.2?'<span class="pass">цель ≤ 20% выполнена</span>':'<span class="fail">цель ≤ 20% не выполнена</span>', fp+' из 15 законных')+
+      tile('Верных решений', Math.round(acc*100)+'%', '', (tp+tn)+' из 30 запросов')+
+      tile('Средний балл мошенничества', Math.round(avg), '', 'у законных — '+Math.round(rows.filter(function(x){return x.c.label==='legit';}).reduce(function(s,x){return s+x.r.score;},0)/15));
+    $('cm').innerHTML='<div class="h"></div><div class="h">Инструмент: подозрительно</div><div class="h">Инструмент: в порядке</div>'+
+      '<div class="h">На самом деле мошенничество</div><div class="g">'+tp+'</div><div class="b">'+fn+'</div>'+
+      '<div class="h">На самом деле законно</div><div class="b">'+fp+'</div><div class="g">'+tn+'</div>';
+    $('rows').innerHTML=rows.map(function(x){
+      var lvl = x.r.score>=50?'high':x.sus?'mid':'low';
+      var lname = lvl==='high'?'Высокий':lvl==='mid'?'Проверить':'Низкий';
+      return '<tr><td class="mono"><button type="button" class="linkbtn" data-open="'+x.c.id+'">'+x.c.id+'</button></td><td>'+esc(x.c.title)+'<div class="muted" style="font-size:.8rem">'+CH[x.c.channel]+(x.c.amount?' · '+fmtMoney(x.c.amount):'')+'</div></td>'+
+        '<td><span class="pill '+x.c.label+'">'+(x.c.label==='fraud'?'мошенничество':'законно')+'</span></td><td class="num">'+x.r.score+'</td>'+
+        '<td><span class="pill '+lvl+'">'+lname+'</span></td><td class="'+(x.ok?'pass':'fail')+'">'+(x.ok?'верно':'ошибка')+'</td><td class="muted" style="font-size:.84rem">'+esc(x.c.why)+'</td></tr>';
+    }).join('');
+    $('rows').querySelectorAll('[data-open]').forEach(function(b){ b.addEventListener('click', function(){ var c=C.filter(function(y){return y.id===b.dataset.open;})[0]; $('sample').value=c.id; fill(c); location.hash='#check'; check(); }); });
+  }
+  function tile(k,v,t,sub){ return '<div class="tile"><div class="k">'+k+'</div><div class="v">'+v+'</div><div class="t muted">'+sub+'</div>'+(t?'<div class="t">'+t+'</div>':'')+'</div>'; }
+  $('thr').addEventListener('input', runTests);
+
+  // --- справочник и правила
+  $('vrows').innerHTML=V.map(function(v){return '<tr><td>'+esc(v.name)+'<div class="muted" style="font-size:.8rem">'+esc(v.what)+'</div></td><td class="mono">'+v.inn+'</td><td class="mono">'+esc(v.email||('*@'+v.domain))+'</td><td class="mono">'+esc(v.phone)+'</td><td>'+esc(v.bankName)+'</td><td class="mono">'+v.bik+'</td><td class="mono">'+v.account+'</td></tr>';}).join('');
+  var RULES=[['Домен-двойник или буквы другого алфавита в адресе',40],['ИНН получателя не совпадает с ИНН контрагента',30],['Бесплатная почта или чужой домен у корпоративного контрагента',30],['Ящик ИП не совпадает со справочником',30],['Просьба о секретности или запрет звонить',25],['Контрольный ключ счёта не сходится с БИК',25],['Счёт физического лица (408…)',25],['Неверный формат счёта',25],['Получателя нет в справочнике',20],['Банк за рубежом',20],['Звонок не с номера из справочника',20],['Оплата на счёт представителя или на карту',20],['Новый номер телефона для связи',15],['БИК неверного формата',15],['Давление сроком',10],['Типичная легенда: арест, проверка, санкции, смена банка',10],['Запрос в мессенджере',10],['ИНН не проходит контрольную сумму',10]];
+  $('rules').innerHTML=RULES.map(function(r){return '<tr><td>'+r[0]+'</td><td class="num">+'+r[1]+'</td></tr>';}).join('');
+
+  // --- старт: рабочее состояние на примере
+  var start=C.filter(function(c){return c.id==='T09';})[0];
+  $('sample').value=start.id; fill(start); check();
+  show();
+})();
+</script>

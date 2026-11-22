@@ -1,0 +1,554 @@
+<title>Реквизит-контроль</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Макет: рабочее место бухгалтера — слева карточка запроса, справа заключение; ведомость тестов отдельной вкладкой. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --sunk:#f6f8fa; --ink:#15202b; --muted:#5a6774; --line:#d6dde4;
+  --accent:#1d5f8a; --accent-ink:#ffffff; --accent-soft:#e3eef6;
+  --ok:#2c7a4b; --ok-soft:#e2f2e8; --warn:#9a6412; --warn-soft:#fbf0dc; --bad:#b03636; --bad-soft:#f9e3e3;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --surface:#161e26; --sunk:#121920; --ink:#e4eaf0; --muted:#94a2af; --line:#283440;
+  --accent:#62a9d9; --accent-ink:#0b1218; --accent-soft:#1a2e3d;
+  --ok:#55b880; --ok-soft:#173226; --warn:#e2a94c; --warn-soft:#352a14; --bad:#ec7272; --bad-soft:#3a1d1d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --surface:#161e26; --sunk:#121920; --ink:#e4eaf0; --muted:#94a2af; --line:#283440;
+  --accent:#62a9d9; --accent-ink:#0b1218; --accent-soft:#1a2e3d;
+  --ok:#55b880; --ok-soft:#173226; --warn:#e2a94c; --warn-soft:#352a14; --bad:#ec7272; --bad-soft:#3a1d1d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin-bottom:16px}
+.brand h1{font-size:1.6rem;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.brand p{margin:2px 0 0;color:var(--muted);max-width:62ch}
+.tag{display:inline-block;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px}
+nav.tabs a{padding:9px 14px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
+nav.tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0}
+.panel h2{font-size:1.05rem;margin:0 0 12px}
+.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+@media (max-width:520px){.row{grid-template-columns:1fr}}
+label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:3px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+textarea{min-height:120px;resize:vertical}
+.mono,input.mono{font-family:var(--f-mono);font-size:.88rem;font-variant-numeric:tabular-nums}
+.field{min-width:0}
+.stack{display:flex;flex-direction:column;gap:12px}
+.sample{display:flex;gap:8px;align-items:end;flex-wrap:wrap;padding:12px;background:var(--accent-soft);border-radius:6px}
+.sample .field{flex:1 1 260px}
+button{font:inherit;cursor:pointer;border-radius:6px;padding:9px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:500}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+.vcard{font-size:.85rem;background:var(--sunk);border:1px dashed var(--line);border-radius:6px;padding:10px 12px;color:var(--muted)}
+.vcard b{color:var(--ink);font-weight:600}
+.vcard .mono{color:var(--ink)}
+.err{color:var(--bad);font-size:.88rem;min-height:1.2em}
+/* заключение */
+.verdict{border-radius:var(--r);padding:14px 16px;border:1px solid var(--line);background:var(--sunk)}
+.verdict.low{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+.verdict.mid{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.verdict.high{background:var(--bad-soft);border-color:color-mix(in srgb,var(--bad) 35%,transparent)}
+.vhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.vname{font-size:1.25rem;font-weight:700}
+.low .vname{color:var(--ok)} .mid .vname{color:var(--warn)} .high .vname{color:var(--bad)}
+.score{font-family:var(--f-mono);font-size:1.6rem;font-weight:500;font-variant-numeric:tabular-nums}
+.score small{font-size:.8rem;color:var(--muted)}
+.scale{position:relative;height:10px;border-radius:5px;margin:10px 0 4px;background:linear-gradient(90deg,var(--ok) 0 25%,var(--warn) 25% 50%,var(--bad) 50% 100%);opacity:.85}
+.pin{position:absolute;top:-4px;width:4px;height:18px;border-radius:2px;background:var(--ink);transform:translateX(-2px)}
+.ticks{position:relative;height:1.1em;font-size:.72rem;color:var(--muted);font-family:var(--f-mono)}.ticks span{position:absolute;transform:translateX(-50%)}.ticks span:first-child{transform:none}.ticks span:last-child{right:0;transform:none}
+.action{margin:10px 0 0;font-weight:500}
+ul.flags{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+ul.flags li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.pts{font-family:var(--f-mono);font-weight:500;text-align:center;border-radius:4px;padding:2px 0;background:var(--bad-soft);color:var(--bad)}
+.pts.s{background:var(--warn-soft);color:var(--warn)}
+.ftitle{font-weight:600}
+.fdet{font-size:.86rem;color:var(--muted);overflow-wrap:anywhere}
+.src{font-family:var(--f-mono);font-size:.72rem;color:var(--accent)}
+.notes{margin:12px 0 0;padding-left:18px;color:var(--muted);font-size:.86rem}
+.check h3{font-size:.95rem;margin:16px 0 8px}
+.check label{display:flex;gap:8px;align-items:flex-start;font-size:.9rem;color:var(--ink);margin:0 0 6px}
+.check input{width:auto;margin-top:4px}
+.decide{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.decide button.hold{border-color:var(--warn);color:var(--warn)}
+.decide button.okb{border-color:var(--ok);color:var(--ok)}
+.decide button.rej{border-color:var(--bad);color:var(--bad)}
+.toast{font-size:.86rem;color:var(--muted);min-height:1.3em;margin-top:6px}
+.log{margin-top:14px;font-size:.84rem}
+.log table{width:100%;border-collapse:collapse}
+.log td{border-top:1px solid var(--line);padding:5px 4px;vertical-align:top}
+/* ведомость */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;min-width:0}
+.tile .k{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile .v{font-family:var(--f-mono);font-size:1.6rem;font-variant-numeric:tabular-nums}
+.tile .t{font-size:.82rem}
+.pass{color:var(--ok)} .fail{color:var(--bad)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table.data{width:100%;border-collapse:collapse;font-size:.88rem;min-width:720px}
+table.data th{text-align:left;font-weight:600;color:var(--muted);font-size:.76rem;text-transform:uppercase;letter-spacing:.05em;padding:9px 10px;border-bottom:1px solid var(--line);background:var(--sunk)}
+table.data td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.data tr:last-child td{border-bottom:0}
+table.data td.num{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:.76rem;border-radius:99px;padding:1px 8px;font-weight:600;white-space:nowrap}
+.pill.low{background:var(--ok-soft);color:var(--ok)} .pill.mid{background:var(--warn-soft);color:var(--warn)} .pill.high{background:var(--bad-soft);color:var(--bad)}
+.pill.fraud{background:var(--bad-soft);color:var(--bad)} .pill.legit{background:var(--ok-soft);color:var(--ok)}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer;font-weight:500}
+.controls{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;margin-bottom:14px}
+.controls input[type=range]{width:220px;padding:0}
+.cm{display:grid;grid-template-columns:auto repeat(2,minmax(0,1fr));gap:4px;font-size:.86rem;max-width:420px}
+.cm div{padding:8px;border-radius:4px;background:var(--sunk);text-align:center}
+.cm .h{background:none;color:var(--muted);font-size:.76rem}
+.cm .g{background:var(--ok-soft);color:var(--ok);font-family:var(--f-mono);font-weight:600}
+.cm .b{background:var(--bad-soft);color:var(--bad);font-family:var(--f-mono);font-weight:600}
+.prose{max-width:72ch}
+.prose h2{font-size:1.15rem;margin:22px 0 8px}
+.prose p,.prose li{color:var(--ink)}
+.muted{color:var(--muted)}
+footer{margin-top:28px;font-size:.8rem;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.pin{transition:left .35s ease}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="tag">Учебный прототип · команда KIB-35</span>
+      <h1>Реквизит-контроль</h1>
+      <p>Проверка запроса на смену платёжных реквизитов до оплаты: красные флаги, оценка риска и порядок обратного звонка. Все компании, адреса и счета вымышлены.</p>
+    </div>
+  </header>
+  <nav class="tabs" aria-label="Разделы">
+    <a href="#check" data-tab="check">Проверка запроса</a>
+    <a href="#test" data-tab="test">Тестовый набор</a>
+    <a href="#vendors" data-tab="vendors">Справочник контрагентов</a>
+    <a href="#about" data-tab="about">Как это работает</a>
+  </nav>
+
+  <!-- ПРОВЕРКА -->
+  <section id="v-check" hidden>
+    <div class="grid">
+      <form class="panel stack" id="form" novalidate>
+        <div class="sample">
+          <div class="field">
+            <label for="sample">Загрузить пример из тестового набора</label>
+            <select id="sample"></select>
+          </div>
+          <button type="button" id="clear">Очистить форму</button>
+        </div>
+        <h2>Запрос на изменение реквизитов</h2>
+        <div class="row">
+          <div class="field">
+            <label for="vendor">Контрагент из справочника</label>
+            <select id="vendor"></select>
+          </div>
+          <div class="field">
+            <label for="channel">Как пришёл запрос</label>
+            <select id="channel">
+              <option value="email">Электронная почта</option>
+              <option value="phone">Телефонный звонок</option>
+              <option value="messenger">Мессенджер</option>
+              <option value="paper">Бумажное письмо (оригинал)</option>
+            </select>
+          </div>
+        </div>
+        <div class="vcard" id="vcard"></div>
+        <div class="row">
+          <div class="field" id="f-sender">
+            <label for="sender">Адрес отправителя</label>
+            <input id="sender" class="mono" autocomplete="off" placeholder="buh@company.test">
+          </div>
+          <div class="field">
+            <label for="phone" id="phone-label">Телефон в сообщении</label>
+            <input id="phone" class="mono" autocomplete="off" placeholder="+7 ...">
+          </div>
+        </div>
+        <div class="field">
+          <label for="text">Текст письма или запись разговора</label>
+          <textarea id="text" placeholder="Вставьте текст запроса"></textarea>
+        </div>
+        <h2>Новые реквизиты</h2>
+        <div class="row">
+          <div class="field"><label for="bank">Банк получателя</label><input id="bank" autocomplete="off"></div>
+          <div class="field"><label for="country">Страна банка</label>
+            <select id="country"><option value="RU">Россия</option><option value="KZ">Казахстан</option><option value="HK">Гонконг</option><option value="LV">Латвия</option><option value="AE">ОАЭ</option><option value="OTHER">Другая</option></select></div>
+          <div class="field"><label for="bik">БИК</label><input id="bik" class="mono" inputmode="numeric" autocomplete="off"></div>
+          <div class="field"><label for="account">Расчётный счёт / IBAN</label><input id="account" class="mono" autocomplete="off"></div>
+          <div class="field"><label for="inn">ИНН получателя</label><input id="inn" class="mono" inputmode="numeric" autocomplete="off"></div>
+          <div class="field"><label for="amount">Сумма ближайшего платежа, ₽</label><input id="amount" class="mono" inputmode="numeric" autocomplete="off"></div>
+        </div>
+        <div class="err" id="err" role="alert"></div>
+        <div><button type="submit" class="primary">Проверить запрос</button></div>
+      </form>
+
+      <div class="panel" id="result" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ТЕСТ -->
+  <section id="v-test" hidden>
+    <div class="controls">
+      <div><label for="thr">Порог «подозрительно»: <b class="mono" id="thrv">25</b> баллов</label>
+        <input type="range" id="thr" min="5" max="70" step="5" value="25"></div>
+      <p class="muted" style="margin:0;max-width:60ch">Набор из 30 синтетических запросов: 15 мошеннических, 15 законных. Цель проекта — найти не меньше 90% мошеннических при доле ложных тревог не больше 20%. Двигайте порог, чтобы увидеть компромисс.</p>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="grid" style="margin-bottom:16px">
+      <div class="panel"><h2>Матрица ошибок</h2><div class="cm" id="cm"></div></div>
+      <div class="panel"><h2>Как читать</h2><p class="muted" style="margin:0">Полнота — доля мошеннических запросов, которые инструмент отправил на проверку. Ложные тревоги — доля законных запросов, по которым он попросил перезвонить зря. Пропуск мошенничества стоит денег, ложная тревога — одного звонка, поэтому порог выбран осторожный.</p></div>
+    </div>
+    <div class="tbl"><table class="data">
+      <thead><tr><th>ID</th><th>Сценарий</th><th>Разметка</th><th style="text-align:right">Балл</th><th>Уровень</th><th>Итог</th><th>Почему так размечен</th></tr></thead>
+      <tbody id="rows"></tbody></table></div>
+  </section>
+
+  <!-- СПРАВОЧНИК -->
+  <section id="v-vendors" hidden>
+    <p class="muted prose" style="margin-top:0">Справочник — это данные, которые бухгалтер уже знает о контрагенте из договора. Новый запрос сравнивается именно с ним, а не с тем, что написано в письме.</p>
+    <div class="tbl"><table class="data">
+      <thead><tr><th>Контрагент</th><th>ИНН</th><th>Почта</th><th>Телефон из договора</th><th>Банк</th><th>БИК</th><th>Счёт</th></tr></thead>
+      <tbody id="vrows"></tbody></table></div>
+  </section>
+
+  <!-- О ПРОЕКТЕ -->
+  <section id="v-about" hidden>
+    <div class="prose">
+      <h2 style="margin-top:0">Проблема</h2>
+      <p>Бухгалтеру малого бизнеса приходит письмо или звонок: «у нас сменились реквизиты, оплатите на новый счёт». Злоумышленники пишут с похожего или взломанного адреса, звонят синтезированным голосом и торопят. Деньги уходят мошенникам, а вернуть их почти невозможно.</p>
+      <ul>
+        <li>46% малых и средних компаний сталкивались с фишингом, созданным ИИ, 29% — с мошенничеством с дипфейками (VikingCloud, 2026 SMB Threat Landscape Report, SRC-097).</li>
+        <li>Доля голосового фишинга среди способов проникновения выросла до 11% (Mandiant, M-Trends 2026, с. 3, SRC-007).</li>
+        <li>Атак на МСБ через поддельные мессенджеры и сервисы видеосвязи — 414 736 (Kaspersky, 2026 SMB threat landscape, SRC-088).</li>
+        <li>70% фишинговых сообщений маскируются под банки (CSA, Singapore Cyber Landscape 2025/2026, с. 26–28).</li>
+        <li>BEC — обманный запрос денег от имени партнёра; подлинность домена проверяется по SPF, DKIM и DMARC (KuppingerCole, Email Security, с. 7, 9, SRC-046).</li>
+      </ul>
+      <h2>Что делает прототип</h2>
+      <p>Сравнивает запрос со справочником контрагентов и ищет признаки подмены. Каждый признак даёт баллы, сумма определяет уровень риска и действие. Затем инструмент ведёт бухгалтера по процедуре обратного звонка и фиксирует решение. Внешние сервисы не используются: данные не покидают браузер.</p>
+      <div class="tbl" style="margin:10px 0"><table class="data" style="min-width:560px">
+        <thead><tr><th>Признак</th><th style="text-align:right">Баллы</th></tr></thead>
+        <tbody id="rules"></tbody></table></div>
+      <p>Уровни: до 24 баллов — низкий риск, 25–49 — требует проверки, от 50 — высокий риск. Счёт проверяется по контрольному ключу Банка России (последние три цифры БИК + номер счёта, веса 7-1-3), ИНН — по контрольной сумме ФНС.</p>
+      <h2>Ограничения</h2>
+      <ul>
+        <li>Правила подобраны командой, а тестовый набор составлен той же командой, поэтому результат на нём завышен. Нужна проверка на запросах, которые команда не видела.</li>
+        <li>Если почта контрагента взломана и мошенник не допускает других ошибок, письмо может набрать мало баллов. Поэтому смена реквизитов всегда подтверждается звонком, какой бы ни была оценка.</li>
+        <li>Прототип не проверяет SPF, DKIM и DMARC и не обращается к банковским базам: это следующий шаг.</li>
+      </ul>
+      <h2>Как подтвердить реквизиты</h2>
+      <p>Порядок взят из практик банков и производителей средств защиты: позвонить по номеру из договора, а не из письма; попросить собеседника самого назвать получателя, банк и последние цифры счёта; записать решение и при крупной сумме получить второе согласование (Bitdefender, шаблон проверки реквизитов, 03.11.2026; Commonwealth Bank, 19.10.2026).</p>
+    </div>
+  </section>
+
+  <footer>Учебный проект по дисциплине «Безопасность предпринимательской деятельности», НИУ ВШЭ, 2026. Работает только на синтетических данных.</footer>
+</div>
+
+<script>
+var DATA = {"vendors": [{"id": "V1", "name": "ООО «Полярснаб»", "what": "упаковка и расходные материалы", "inn": "7815001231", "domain": "polarsnab.test", "email": "", "phone": "+7 812 555-01-10", "bankName": "АО «Банк Северная Пальмира»", "bik": "044030901", "account": "40702810000000001234"}, {"id": "V2", "name": "ООО «ТехноСервис-Логистик»", "what": "доставка и складская логистика", "inn": "7729004567", "domain": "tslog.test", "email": "", "phone": "+7 495 555-02-20", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40702810400000002345"}, {"id": "V3", "name": "АО «Северный хлеб»", "what": "поставки хлебобулочных изделий", "inn": "7810007896", "domain": "sevhleb.test", "email": "", "phone": "+7 812 555-03-30", "bankName": "АО «Банк Северная Пальмира»", "bik": "044030901", "account": "40702810200000003456"}, {"id": "V4", "name": "ИП Корнеев Андрей Викторович", "what": "ремонт торгового оборудования", "inn": "782601234511", "domain": "gmail.com", "email": "korneev.remont.test@gmail.com", "phone": "+7 921 555-04-40", "bankName": "ПАО «Волжский кредит»", "bik": "043601702", "account": "40802810400000004567"}, {"id": "V5", "name": "ООО «Балтийская клининговая компания»", "what": "уборка помещений", "inn": "7801002468", "domain": "bkk-clean.test", "email": "", "phone": "+7 812 555-05-50", "bankName": "ООО КБ «Уралкапитал»", "bik": "046577905", "account": "40702810000000005678"}, {"id": "V6", "name": "ООО «ДатаЛинк»", "what": "ИТ-обслуживание и 1С", "inn": "7714001355", "domain": "datalink-it.test", "email": "", "phone": "+7 495 555-06-60", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40702810800000006789"}, {"id": "V7", "name": "ООО «ЮгАгроПоставка»", "what": "поставки овощей и фруктов", "inn": "6164005792", "domain": "yugagro.test", "email": "", "phone": "+7 863 555-07-70", "bankName": "АО «Донской расчётный банк»", "bik": "046015811", "account": "40702810800000007890"}, {"id": "V8", "name": "ООО «Пиксель-Медиа»", "what": "наружная реклама и печать", "inn": "7841008642", "domain": "pixelmedia.test", "email": "", "phone": "+7 812 555-08-80", "bankName": "ООО КБ «Уралкапитал»", "bik": "046577905", "account": "40702810800000008901"}], "cases": [{"id": "T01", "label": "fraud", "title": "Домен-двойник: цифра 1 вместо буквы l", "vendorId": "V1", "channel": "email", "sender": "buh@po1arsnab.test", "phoneInMessage": "", "country": "RU", "text": "Добрый день! Срочно сообщаем об изменении реквизитов: наш расчётный счёт переведён в другой банк. Оплату по счёту №418 просим произвести сегодня на новые реквизиты, иначе отгрузка будет перенесена.", "amount": 184500, "why": "Домен отличается от справочника одной буквой (po1arsnab вместо polarsnab), давление сроком.", "bankName": "ПАО «Волжский кредит»", "bik": "043601702", "account": "40702810800006626571", "recipientInn": "7815001231"}, {"id": "T02", "label": "fraud", "title": "Бесплатная почта и «арест счёта»", "vendorId": "V2", "channel": "email", "sender": "tslog.finance@mail.ru", "phoneInMessage": "", "country": "RU", "text": "Здравствуйте. Наш основной счёт временно арестован налоговой, поэтому оплату за ноябрь направьте, пожалуйста, на резервный счёт. Письмо с корпоративной почты отправить не можем — сервер на обслуживании.", "amount": 96000, "why": "Корпоративный контрагент пишет с бесплатной почты, причина «арест счёта», объяснение, почему не с корпоративного адреса.", "bankName": "ООО КБ «Уралкапитал»", "bik": "046577905", "account": "40702810100003209986", "recipientInn": "7729004567"}, {"id": "T03", "label": "fraud", "title": "Кириллическая «е» в домене и просьба не звонить", "vendorId": "V3", "channel": "email", "sender": "finance@sevhlеb.test", "phoneInMessage": "", "country": "RU", "text": "Уважаемые партнёры! С 20 ноября оплата принимается только на новый счёт. Просим не звонить в бухгалтерию по этому вопросу — телефоны перегружены, все вопросы только по почте.", "amount": 231700, "why": "В домене одна буква кириллическая (визуально не отличить), просьба не звонить блокирует проверку.", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40702810500006712102", "recipientInn": "7810007896"}, {"id": "T04", "label": "fraud", "title": "Перевод в иностранный банк «из-за санкций»", "vendorId": "V8", "channel": "email", "sender": "accounts@pixelmedia-group.test", "phoneInMessage": "", "country": "HK", "text": "В связи с санкционными ограничениями переходим на расчёты через партнёрскую компанию в Гонконге. Реквизиты во вложении, просим оплатить счёт до конца дня.", "amount": 158000, "why": "Иностранный банк, другой домен с названием компании, срочность.", "bankName": "Asia Trade Settlement Bank Ltd (Гонконг)", "bik": "", "account": "HK48 0123 4567 8901 2345 67", "recipientInn": "7841008642"}, {"id": "T05", "label": "fraud", "title": "Новое юрлицо под видом реорганизации", "vendorId": "V1", "channel": "email", "sender": "info@polarsnab-trade.test", "phoneInMessage": "", "country": "RU", "text": "Сообщаем, что в связи с реорганизацией все расчёты переводятся на ООО «Полярснаб-Трейд». Договор действует в прежней редакции, допсоглашение направим позже. Оплату по текущим счетам просим перечислять уже на новые реквизиты.", "amount": 72300, "why": "ИНН получателя не совпадает с ИНН контрагента, домен с названием компании, но не из справочника.", "bankName": "АО «Донской расчётный банк»", "bik": "046015811", "account": "40702810900003584508", "recipientInn": "6169001110"}, {"id": "T06", "label": "fraud", "title": "Сообщение в мессенджере от «директора»", "vendorId": "", "channel": "messenger", "sender": "", "phoneInMessage": "+7 999 555-11-22", "country": "RU", "text": "Это Сергей Петрович, пишу с нового номера. Нужно срочно оплатить предоплату новому поставщику, реквизиты ниже. Вопрос конфиденциальный, никому пока не сообщайте, я на совещании и не могу говорить.", "amount": 450000, "why": "Получатель не из справочника, счёт физлица, мессенджер, секретность, давление.", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40817810700005796720", "recipientInn": "500309876502"}, {"id": "T07", "label": "fraud", "title": "Звонок «бухгалтера» с неизвестного номера", "vendorId": "V6", "channel": "phone", "sender": "", "phoneInMessage": "+7 958 555-33-44", "country": "RU", "text": "(запись звонка) Здравствуйте, это бухгалтерия ДатаЛинк. У нас сменился банк, продиктую новые реквизиты. Пришлите подтверждение оплаты на этот же номер, на старый телефон не звоните, он больше не работает.", "amount": 64000, "why": "Звонок не с номера из справочника, просьба не звонить на старый номер; голос может быть синтезирован.", "bankName": "ООО КБ «Уралкапитал»", "bik": "046577905", "account": "40702810200008243151", "recipientInn": "7714001355"}, {"id": "T08", "label": "fraud", "title": "Взломанный ящик: просьба платить «представителю»", "vendorId": "V5", "channel": "email", "sender": "buh@bkk-clean.test", "phoneInMessage": "", "country": "RU", "text": "Добрый день. Пока у компании идёт смена банка, просим перечислить оплату за ноябрь на личный счёт нашего представителя. Это временно, акт сверки пришлём позже.", "amount": 58000, "why": "Письмо с настоящего домена (ящик взломан), но счёт физлица и другой ИНН.", "bankName": "ПАО «Волжский кредит»", "bik": "043601702", "account": "40817810400005230350", "recipientInn": "780212345600"}, {"id": "T09", "label": "fraud", "title": "Взломанный ящик: «аудит» и новый телефон", "vendorId": "V7", "channel": "email", "sender": "buhgalteria@yugagro.test", "phoneInMessage": "+7 928 555-90-91", "country": "RU", "text": "Здравствуйте! В связи с проверкой банка наш счёт временно недоступен. Оплату по счёту №1127 нужно провести до конца дня на реквизиты ниже. По всем вопросам — по номеру +7 928 555-90-91.", "amount": 127400, "why": "Настоящий домен, но новый телефон, срочность и «проверка банка» — типичный сценарий после взлома почты.", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40702810400002037020", "recipientInn": "6164005792"}, {"id": "T10", "label": "fraud", "title": "Ошибка контрольного ключа и похожий домен", "vendorId": "V7", "channel": "email", "sender": "oplata@yugagro-pay.test", "phoneInMessage": "", "country": "RU", "text": "Направляем актуальные реквизиты для оплаты. Предыдущие реквизиты недействительны с 15.11.", "amount": 88900, "why": "Счёт не проходит проверку контрольного ключа по БИК, домен содержит название компании, но отличается.", "bankName": "АО «Донской расчётный банк»", "bik": "046015811", "account": "40702810800009820682", "recipientInn": "6164005792"}, {"id": "T11", "label": "fraud", "title": "Счёт в латвийском банке с бесплатной почты", "vendorId": "V8", "channel": "email", "sender": "pixelmedia.buh@gmail.com", "phoneInMessage": "", "country": "LV", "text": "Добрый день! Обновлённый счёт во вложении. Обратите внимание: изменились банковские реквизиты, оплату просим произвести на счёт в Латвии.", "amount": 43000, "why": "Бесплатная почта у корпоративного контрагента, иностранный банк.", "bankName": "Baltic Pay Bank AS (Латвия)", "bik": "", "account": "LV80 BPAY 0000 4357 1956 0", "recipientInn": "7841008642"}, {"id": "T12", "label": "fraud", "title": "Скан «официального письма» с похожего домена", "vendorId": "V2", "channel": "email", "sender": "director@ts-log.test", "phoneInMessage": "", "country": "RU", "text": "Направляем официальное письмо за подписью генерального директора об изменении реквизитов (скан во вложении). Просим держать информацию в тайне до публичного объявления о смене банка.", "amount": 205000, "why": "Домен-двойник (ts-log вместо tslog), просьба держать в тайне.", "bankName": "АО «Банк Северная Пальмира»", "bik": "044030901", "account": "40702810900005598839", "recipientInn": "7729004567"}, {"id": "T13", "label": "fraud", "title": "Звонок «службы безопасности банка»", "vendorId": "", "channel": "phone", "sender": "", "phoneInMessage": "+7 900 555-77-00", "country": "RU", "text": "(запись звонка) Служба безопасности банка: по вашему счёту зафиксирована подозрительная операция. Немедленно переведите остаток на защищённый резервный счёт. Не обсуждайте ситуацию с коллегами, это может помешать расследованию.", "amount": 900000, "why": "Получатель не из справочника, счёт физлица, давление и секретность.", "bankName": "ПАО «Волжский кредит»", "bik": "043601702", "account": "40817810100007150893", "recipientInn": "773145678952"}, {"id": "T14", "label": "fraud", "title": "ИП: другой ящик и «новый телефон»", "vendorId": "V4", "channel": "email", "sender": "korneev.remont.new.test@gmail.com", "phoneInMessage": "+7 931 555-12-12", "country": "RU", "text": "Андрей Корнеев, ремонт оборудования. Старый ящик взломали, теперь пишу отсюда. Поменял банк, звоните только на новый номер.", "amount": 37500, "why": "Адрес отличается от адреса ИП в справочнике, новый телефон.", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40802810700002622572", "recipientInn": "782601234511"}, {"id": "T15", "label": "fraud", "title": "Вежливое письмо без давления, но с подменой домена", "vendorId": "V6", "channel": "email", "sender": "finance@datalink-lt.test", "phoneInMessage": "", "country": "RU", "text": "Коллеги, добрый день. Сообщаем об изменении банковских реквизитов ООО «ДатаЛинк». Новые реквизиты указаны ниже. Спасибо за сотрудничество!", "amount": 64000, "why": "Нет срочности и угроз — сложный случай: выдаёт только домен, отличающийся от справочника.", "bankName": "АО «Донской расчётный банк»", "bik": "046015811", "account": "40702810700007111782", "recipientInn": "7714001355"}, {"id": "T16", "label": "legit", "title": "Плановая смена банка с корпоративного домена", "vendorId": "V1", "channel": "email", "sender": "buh@polarsnab.test", "phoneInMessage": "", "country": "RU", "text": "Уважаемые партнёры! С 1 декабря ООО «Полярснаб» переходит на обслуживание в ПАО «Волжский кредит». Официальное письмо за подписью директора направим почтой. Просим подтвердить получение звонком по номеру из договора: +7 812 555-01-10.", "amount": 0, "why": "Корпоративный домен, тот же ИНН, уведомление заранее, сам контрагент предлагает проверку звонком.", "bankName": "ПАО «Волжский кредит»", "bik": "043601702", "account": "40702810500001144633", "recipientInn": "7815001231"}, {"id": "T17", "label": "legit", "title": "Смена банка с подписанным уведомлением", "vendorId": "V2", "channel": "email", "sender": "finance@tslog.test", "phoneInMessage": "+7 495 555-02-20", "country": "RU", "text": "Добрый день! Во вложении уведомление об изменении реквизитов с подписью и печатью. Реквизиты вступают в силу с 01.12.2026. Контактный телефон бухгалтерии прежний.", "amount": 0, "why": "Домен и телефон совпадают со справочником, ИНН прежний.", "bankName": "АО «Банк Северная Пальмира»", "bik": "044030901", "account": "40702810700009625005", "recipientInn": "7729004567"}, {"id": "T18", "label": "legit", "title": "ИП пишет с того же ящика из справочника", "vendorId": "V4", "channel": "email", "sender": "korneev.remont.test@gmail.com", "phoneInMessage": "", "country": "RU", "text": "Добрый день, это Андрей Корнеев. Открыл второй счёт в том же банке, по новым счетам оплачивайте на него. Старый счёт тоже работает.", "amount": 12000, "why": "ИП всегда пользовался этим адресом (он есть в справочнике), банк прежний.", "bankName": "ПАО «Волжский кредит»", "bik": "043601702", "account": "40802810000001189179", "recipientInn": "782601234511"}, {"id": "T19", "label": "legit", "title": "Срочная оплата по прежним реквизитам", "vendorId": "V3", "channel": "email", "sender": "sales@sevhleb.test", "phoneInMessage": "", "country": "RU", "text": "Просим срочно оплатить счёт №905 за поставку, сегодня последний день по договору. Реквизиты без изменений.", "amount": 48600, "why": "Реквизиты совпадают со справочником; слово «срочно» само по себе не повод для тревоги.", "bankName": "АО «Банк Северная Пальмира»", "bik": "044030901", "account": "40702810200000003456", "recipientInn": "7810007896"}, {"id": "T20", "label": "legit", "title": "Смена БИК после слияния банков", "vendorId": "V6", "channel": "email", "sender": "buh@datalink-it.test", "phoneInMessage": "", "country": "RU", "text": "Уведомляем, что в связи с присоединением нашего банка к АО «Банк Северная Пальмира» изменились БИК и корреспондентский счёт. Номер нашего расчётного счёта и ИНН не меняются, подробности — по телефону из договора.", "amount": 0, "why": "Корпоративный домен, тот же ИНН, банк из справочника банков.", "bankName": "АО «Банк Северная Пальмира»", "bik": "044030901", "account": "40702810800002621786", "recipientInn": "7714001355"}, {"id": "T21", "label": "legit", "title": "Звонок с номера из справочника", "vendorId": "V8", "channel": "phone", "sender": "", "phoneInMessage": "+7 812 555-08-80", "country": "RU", "text": "(запись звонка) Это Марина, бухгалтер Пиксель-Медиа. Звоню предупредить: со следующего месяца у нас новый счёт, письмо с реквизитами пришлём с корпоративной почты.", "amount": 0, "why": "Звонок с номера из справочника, ИНН прежний, сам контрагент обещает письменное подтверждение.", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40702810900009309374", "recipientInn": "7841008642"}, {"id": "T22", "label": "legit", "title": "Новый счёт в том же банке", "vendorId": "V7", "channel": "email", "sender": "buhgalteria@yugagro.test", "phoneInMessage": "", "country": "RU", "text": "Добрый день. Мы открыли отдельный счёт для расчётов с сетевыми клиентами в том же банке. Просим с декабря оплачивать на него. Телефон бухгалтерии прежний.", "amount": 0, "why": "Тот же банк, домен, ИНН.", "bankName": "АО «Донской расчётный банк»", "bik": "046015811", "account": "40702810000007283860", "recipientInn": "6164005792"}, {"id": "T23", "label": "legit", "title": "Сроки и смена банка, но всё сходится", "vendorId": "V5", "channel": "email", "sender": "office@bkk-clean.test", "phoneInMessage": "", "country": "RU", "text": "Здравствуйте! Мы сменили банк. Просим до конца дня подтвердить, что новые реквизиты внесены, чтобы декабрьский счёт выставить уже на них.", "amount": 0, "why": "Ловушка ложного срабатывания: есть срок и «смена банка», но домен, ИНН и телефон в порядке.", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40702810500001423111", "recipientInn": "7801002468"}, {"id": "T24", "label": "legit", "title": "Поддомен корпоративной почты", "vendorId": "V1", "channel": "email", "sender": "manager@mail.polarsnab.test", "phoneInMessage": "", "country": "RU", "text": "Пишу с почтового поддомена — у нас новая почтовая система. Подтверждаю письмо бухгалтерии о переходе в ПАО «Волжский кредит» с 1 декабря.", "amount": 0, "why": "Поддомен корпоративного домена — это тот же контрагент.", "bankName": "ПАО «Волжский кредит»", "bik": "043601702", "account": "40702810300006719849", "recipientInn": "7815001231"}, {"id": "T25", "label": "legit", "title": "Бумажное письмо с курьером", "vendorId": "V2", "channel": "paper", "sender": "", "phoneInMessage": "", "country": "RU", "text": "Оригинал письма об изменении реквизитов получен курьером, на бланке, с подписью генерального директора и печатью. Телефон в письме совпадает с договором.", "amount": 0, "why": "Оригинал на бланке, тот же ИНН.", "bankName": "АО «Банк Северная Пальмира»", "bik": "044030901", "account": "40702810400009324402", "recipientInn": "7729004567"}, {"id": "T26", "label": "legit", "title": "ИП звонит со своего номера", "vendorId": "V4", "channel": "phone", "sender": "", "phoneInMessage": "+7 921 555-04-40", "country": "RU", "text": "(запись звонка) Андрей Корнеев: перешёл в другой банк, реквизиты отправил на почту с того же адреса, что и всегда.", "amount": 0, "why": "Номер из справочника, ИНН прежний.", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40802810300001865329", "recipientInn": "782601234511"}, {"id": "T27", "label": "legit", "title": "Стандартный дисклеймер о конфиденциальности", "vendorId": "V3", "channel": "email", "sender": "buh@sevhleb.test", "phoneInMessage": "", "country": "RU", "text": "Сообщаем новые реквизиты с 01.12.2026, официальное письмо во вложении. Это сообщение и любые вложения к нему конфиденциальны и предназначены только для адресата.", "amount": 0, "why": "Ловушка: слово «конфиденциальны» из стандартной подписи не должно считаться просьбой о секретности.", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40702810900001392088", "recipientInn": "7810007896"}, {"id": "T28", "label": "legit", "title": "Длинное письмо на английском от ИТ-подрядчика", "vendorId": "V6", "channel": "email", "sender": "billing@datalink-it.test", "phoneInMessage": "", "country": "RU", "text": "Dear partners, please be informed that DataLink LLC will move its settlement account to Bank Novy Vek starting December 1, 2026. Our TIN and contract terms remain unchanged. The signed notice is attached. Please confirm by phone using the number in the contract.", "amount": 0, "why": "Корпоративный домен, ИНН прежний, текст на английском не должен ломать анализ.", "bankName": "АО «Банк Новый Век»", "bik": "044525987", "account": "40702810800004936800", "recipientInn": "7714001355"}, {"id": "T29", "label": "legit", "title": "Филиал в Казахстане (пограничный случай)", "vendorId": "V8", "channel": "email", "sender": "buh@pixelmedia.test", "phoneInMessage": "", "country": "KZ", "text": "Добрый день! Для оплаты услуг нашего нового филиала в Алматы используйте счёт в казахстанском банке. Договор и ИНН головной компании прежние, письмо с подписью во вложении.", "amount": 0, "why": "Законная операция, но иностранный банк даёт 20 баллов — у самого порога. Любой дополнительный признак переведёт запрос в «Требует проверки».", "bankName": "АО «Евразийский расчётный банк» (Казахстан)", "bik": "", "account": "KZ75 125K ZT10 0130 0335", "recipientInn": "7841008642"}, {"id": "T30", "label": "legit", "title": "Срочно, но с тем же банком и телефоном", "vendorId": "V7", "channel": "email", "sender": "director@yugagro.test", "phoneInMessage": "+7 863 555-07-70", "country": "RU", "text": "Срочно: с понедельника расчёты только на новый счёт в нашем же банке, старый закрываем. Если есть вопросы — звоните по обычному номеру.", "amount": 0, "why": "Срочность есть, но домен, телефон, банк и ИНН совпадают.", "bankName": "АО «Донской расчётный банк»", "bik": "046015811", "account": "40702810000006452359", "recipientInn": "6164005792"}]};
+// Движок «Реквизит-контроль»: прозрачные правила, без обращения к внешним сервисам.
+// Каждый сработавший признак даёт баллы и объяснение; итог — сумма баллов.
+var RK = (function () {
+  var FREE_MAIL = ['gmail.com', 'mail.ru', 'yandex.ru', 'ya.ru', 'bk.ru', 'list.ru', 'inbox.ru',
+    'rambler.ru', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com', 'proton.me', 'protonmail.com', 'gmx.com'];
+
+  var LEVELS = [
+    { min: 50, id: 'high', name: 'Высокий риск', action: 'Не платить. Позвонить контрагенту по номеру из справочника и сообщить руководителю.' },
+    { min: 25, id: 'mid', name: 'Требует проверки', action: 'Приостановить оплату до подтверждения звонком по номеру из справочника.' },
+    { min: 0, id: 'low', name: 'Низкий риск', action: 'Можно провести после стандартной сверки реквизитов.' }
+  ];
+  var THRESHOLD = 25; // с этого балла запрос считается подозрительным (для метрик)
+
+  var RX = {
+    urgency: /(срочн|сегодня|до конца дня|немедленн|в течение часа|незамедлительн|последний день|иначе отгрузк|сорв[её]тся|штраф|urgent|asap|immediately|today)/i,
+    secrecy: /(не звоните|не звонить|никому (пока )?не сообщ|не сообщайте|держ[а-яёa-z]* (информацию )?в тайне|не обсуждайте|не ставьте в копию|только по почте|не отвечайте на звонки|на старый (телефон|номер) не звоните|вопрос конфиденциальный|строго конфиденциально|keep (this|it) confidential|do not call)/i,
+    reason: /(арест|заблокирован|блокировк|аудит|проверк[а-яёa-z]* банка|реорганизац|санкци|сменил[а-яёa-z]* банк|смен[а-яёa-z]* банк|переходим на расч|временно недоступ|счёт недоступ|сч[её]т закры)/i,
+    representative: /(личный сч[её]т|на сч[её]т (нашего )?представител|на карту|физическ[а-яёa-z]* лиц)/i
+  };
+
+  function digits(s) { return String(s || '').replace(/\D/g, ''); }
+
+  function lev(a, b) {
+    var m = a.length, n = b.length, d = [], i, j;
+    for (i = 0; i <= m; i++) { d[i] = [i]; }
+    for (j = 0; j <= n; j++) { d[0][j] = j; }
+    for (i = 1; i <= m; i++) for (j = 1; j <= n; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[m][n];
+  }
+
+  function accountKeyOk(bik, acc) {
+    if (!/^\d{9}$/.test(bik) || !/^\d{20}$/.test(acc)) return null;
+    var s = bik.slice(-3) + acc, w = [7, 1, 3], sum = 0;
+    for (var i = 0; i < s.length; i++) sum += (+s[i]) * w[i % 3];
+    return sum % 10 === 0;
+  }
+
+  function innOk(inn) {
+    inn = digits(inn);
+    function chk(ds, w) { var s = 0; for (var i = 0; i < w.length; i++) s += ds[i] * w[i]; return s % 11 % 10; }
+    var d = inn.split('').map(Number);
+    if (inn.length === 10) return chk(d, [2, 4, 10, 3, 5, 9, 4, 6, 8]) === d[9];
+    if (inn.length === 12) return chk(d, [7, 2, 4, 10, 3, 5, 9, 4, 6, 8]) === d[10] && chk(d, [3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8]) === d[11];
+    return false;
+  }
+
+  function core(domain) { return domain.replace(/\.(test|ru|com|рф|net|org)$/i, ''); }
+
+  // req: {vendor, channel, sender, phoneInMessage, bankName, bik, account, country, recipientInn, text}
+  function analyze(req) {
+    var flags = [], info = [], v = req.vendor || null;
+    function add(id, pts, title, detail, src) { flags.push({ id: id, pts: pts, title: title, detail: detail, src: src || '' }); }
+    var text = String(req.text || '');
+    var channel = req.channel || 'email';
+
+    // 1. Контрагент
+    if (!v) add('unknown', 20, 'Получателя нет в справочнике контрагентов', 'Платёж новому получателю по просьбе из письма, звонка или мессенджера — базовый сценарий подмены.', 'SRC-097');
+
+    // 2. Отправитель (почта)
+    var sender = String(req.sender || '').trim().toLowerCase();
+    if (channel === 'email') {
+      if (!sender) info.push('Адрес отправителя не указан — проверка домена пропущена.');
+      else {
+        var dom = sender.split('@')[1] || '';
+        var nonAscii = /[^\x00-\x7f]/.test(dom);
+        if (v) {
+          var vdom = v.domain.toLowerCase();
+          var vFree = FREE_MAIL.indexOf(vdom) >= 0;
+          if (nonAscii) add('homoglyph', 40, 'В адресе есть буквы другого алфавита', 'Домен «' + dom + '» содержит кириллические символы, похожие на латинские. На глаз отличить нельзя.', 'SRC-046');
+          else if (vFree) {
+            if (v.email && sender !== v.email.toLowerCase()) add('mailbox', 30, 'Адрес не совпадает с адресом из справочника', 'Контрагент пишет с бесплатной почты, но не с того ящика, что в справочнике (' + v.email + ').', 'SRC-046');
+          } else if (dom === vdom || dom.slice(-(vdom.length + 1)) === '.' + vdom) {
+            info.push('Домен отправителя совпадает со справочником (' + vdom + '). Это не гарантия: ящик могли взломать.');
+          } else {
+            var a = core(dom), b = core(vdom);
+            var base = b.split(/[-.]/)[0];
+            var dist = lev(a.replace(/[-.]/g, ''), b.replace(/[-.]/g, ''));
+            if (FREE_MAIL.indexOf(dom) >= 0) add('freemail', 30, 'Корпоративный контрагент пишет с бесплатной почты', 'В справочнике домен ' + vdom + ', письмо пришло с ' + dom + '.', 'SRC-046');
+            else if (dist <= 2 || (base.length >= 4 && a.indexOf(base) >= 0)) add('lookalike', 40, 'Домен-двойник', 'Домен «' + dom + '» похож на «' + vdom + '» из справочника, но не совпадает.', 'SRC-046');
+            else add('domain', 30, 'Домен отправителя не из справочника', 'В справочнике ' + vdom + ', письмо пришло с ' + dom + '.', 'SRC-046');
+          }
+        } else if (nonAscii) add('homoglyph', 40, 'В адресе есть буквы другого алфавита', 'Домен «' + dom + '» содержит нелатинские символы.', 'SRC-046');
+      }
+    }
+
+    // 3. Канал и телефон
+    var ph = digits(req.phoneInMessage);
+    var vph = v ? digits(v.phone) : '';
+    if (channel === 'messenger') add('messenger', 10, 'Запрос пришёл в мессенджере', 'Мессенджеры легко подделать: новый номер, чужое фото, голосовое сообщение.', 'SRC-088');
+    if (channel === 'phone' || channel === 'messenger') {
+      if (v && ph && ph !== vph) add('callerid', 20, 'Звонок или сообщение не с номера из справочника', 'Номер ' + req.phoneInMessage + ' не совпадает с ' + v.phone + '. Голос можно синтезировать.', 'SRC-007');
+      if (v && ph && ph === vph) info.push('Номер звонившего совпадает со справочником.');
+    } else if (v && ph && ph !== vph) add('newphone', 15, 'В сообщении новый номер для связи', 'Предлагают звонить на ' + req.phoneInMessage + ', а в справочнике ' + v.phone + '. Звонить нужно только по номеру из справочника.', 'SRC-007');
+
+    // 4. Реквизиты
+    var country = (req.country || 'RU').toUpperCase();
+    var acc = digits(req.account), bik = digits(req.bik);
+    if (v && country === 'RU' && acc === digits(v.account) && bik === v.bik) info.push('Реквизиты совпадают со справочником — смены реквизитов нет.');
+    if (country !== 'RU') add('foreign', 20, 'Банк получателя за рубежом', 'Перевод за границу вместо привычного российского счёта контрагента.', 'SRC-A');
+    else if (acc || bik) {
+      if (!/^\d{20}$/.test(acc)) add('accformat', 25, 'Номер счёта неверного формата', 'Расчётный счёт в России состоит из 20 цифр, указано ' + acc.length + '.', 'ЦБ РФ');
+      else if (!/^\d{9}$/.test(bik)) add('bikformat', 15, 'БИК неверного формата', 'БИК состоит из 9 цифр.', 'ЦБ РФ');
+      else if (accountKeyOk(bik, acc) === false) add('acckey', 25, 'Контрольный ключ счёта не сходится с БИК', 'Счёт не проходит проверку по алгоритму Банка России: это опечатка или подделка.', 'ЦБ РФ');
+      if (/^408/.test(acc) && !(v && /^408/.test(digits(v.account)))) add('personal', 25, 'Счёт физического лица', 'Счёт начинается с 408 — это счёт физлица или ИП, а не организации.', 'SRC-097');
+    }
+
+    // 5. ИНН получателя
+    var rinn = digits(req.recipientInn);
+    if (v && rinn && rinn !== digits(v.inn)) add('inn', 30, 'ИНН получателя отличается от ИНН контрагента', 'Деньги уйдут другому лицу: ' + rinn + ' вместо ' + v.inn + '.', 'SRC-001');
+    if (rinn && !innOk(rinn)) add('innsum', 10, 'ИНН не проходит проверку контрольной суммы', 'Такого ИНН не может существовать.', 'ФНС');
+
+    // 6. Текст
+    var m;
+    if ((m = text.match(RX.urgency))) add('urgency', 10, 'Давление сроком', 'Фраза «' + m[0] + '». Срочность мешает проверить запрос.', 'SRC-097');
+    if ((m = text.match(RX.secrecy))) add('secrecy', 25, 'Просьба о секретности или запрет звонить', 'Фраза «' + m[0] + '». Мошенники отрезают пути проверки.', 'SRC-007');
+    if ((m = text.match(RX.reason))) add('reason', 10, 'Типичное объяснение смены реквизитов', 'Фраза «' + m[0] + '». Арест, проверка, санкции и смена банка — частые легенды.', 'SRC-001');
+    if ((m = text.match(RX.representative))) add('rep', 20, 'Оплата на счёт другого лица', 'Фраза «' + m[0] + '».', 'SRC-001');
+
+    var score = flags.reduce(function (s, f) { return s + f.pts; }, 0);
+    var level = LEVELS.filter(function (l) { return score >= l.min; })[0];
+    return { score: score, level: level, flags: flags.sort(function (x, y) { return y.pts - x.pts; }), info: info, suspicious: score >= THRESHOLD };
+  }
+
+  function evaluate(cases, vendors) {
+    var byId = {}; vendors.forEach(function (v) { byId[v.id] = v; });
+    var res = cases.map(function (c) {
+      var r = analyze(Object.assign({}, c, { vendor: byId[c.vendorId] || null }));
+      return { c: c, r: r, ok: r.suspicious === (c.label === 'fraud') };
+    });
+    var tp = res.filter(function (x) { return x.c.label === 'fraud' && x.r.suspicious; }).length;
+    var fn = res.filter(function (x) { return x.c.label === 'fraud' && !x.r.suspicious; }).length;
+    var fp = res.filter(function (x) { return x.c.label === 'legit' && x.r.suspicious; }).length;
+    var tn = res.filter(function (x) { return x.c.label === 'legit' && !x.r.suspicious; }).length;
+    return { rows: res, tp: tp, fn: fn, fp: fp, tn: tn, recall: tp / (tp + fn || 1), fpr: fp / (fp + tn || 1) };
+  }
+
+  return { analyze: analyze, evaluate: evaluate, accountKeyOk: accountKeyOk, innOk: innOk, LEVELS: LEVELS, THRESHOLD: THRESHOLD };
+})();
+
+
+(function(){
+  var V = DATA.vendors, C = DATA.cases, byId = {};
+  V.forEach(function(v){ byId[v.id]=v; });
+  var $ = function(id){ return document.getElementById(id); };
+  var CH = {email:'Почта', phone:'Звонок', messenger:'Мессенджер', paper:'Бумажное письмо'};
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function fmtMoney(n){ n=+n||0; return n? n.toLocaleString('ru-RU')+' ₽':'—'; }
+
+  // --- вкладки
+  var TABS=['check','test','vendors','about'];
+  function show(){
+    var t=(location.hash||'#check').slice(1); if(TABS.indexOf(t)<0) t='check';
+    TABS.forEach(function(x){ $('v-'+x).hidden = x!==t; });
+    document.querySelectorAll('nav.tabs a').forEach(function(a){ if(a.dataset.tab===t) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+    if(t==='test') runTests();
+  }
+  window.addEventListener('hashchange', show);
+
+  // --- селекты
+  var vs=$('vendor');
+  vs.innerHTML='<option value="">— нет в справочнике —</option>'+V.map(function(v){return '<option value="'+v.id+'">'+esc(v.name)+'</option>';}).join('');
+  $('sample').innerHTML='<option value="">— выберите пример —</option>'+
+    '<optgroup label="Мошеннические">'+C.filter(function(c){return c.label==='fraud';}).map(function(c){return '<option value="'+c.id+'">'+c.id+' · '+esc(c.title)+'</option>';}).join('')+'</optgroup>'+
+    '<optgroup label="Законные">'+C.filter(function(c){return c.label==='legit';}).map(function(c){return '<option value="'+c.id+'">'+c.id+' · '+esc(c.title)+'</option>';}).join('')+'</optgroup>';
+
+  function vcard(){
+    var v=byId[vs.value];
+    $('vcard').innerHTML = v ? '<b>'+esc(v.name)+'</b> · '+esc(v.what)+'<br>ИНН <span class="mono">'+v.inn+'</span> · почта <span class="mono">'+esc(v.email||('*@'+v.domain))+'</span> · тел. <span class="mono">'+esc(v.phone)+'</span><br>'+esc(v.bankName)+' · БИК <span class="mono">'+v.bik+'</span> · счёт <span class="mono">'+v.account+'</span>'
+      : 'Получатель не выбран из справочника. Если это новый поставщик, его нужно сначала проверить и внести в справочник по договору.';
+  }
+  function channelUI(){
+    var ch=$('channel').value;
+    $('f-sender').hidden = ch!=='email';
+    $('phone-label').textContent = ch==='phone' ? 'Номер, с которого звонили' : ch==='messenger' ? 'Номер или аккаунт отправителя' : 'Телефон, указанный в сообщении';
+  }
+  vs.addEventListener('change', vcard);
+  $('channel').addEventListener('change', channelUI);
+
+  function fill(c){
+    vs.value=c.vendorId||''; $('channel').value=c.channel; $('sender').value=c.sender||''; $('phone').value=c.phoneInMessage||'';
+    $('text').value=c.text||''; $('bank').value=c.bankName||''; $('country').value=['RU','KZ','HK','LV','AE'].indexOf(c.country)>=0?c.country:'OTHER';
+    $('bik').value=c.bik||''; $('account').value=c.account||''; $('inn').value=c.recipientInn||''; $('amount').value=c.amount||'';
+    vcard(); channelUI();
+  }
+  $('sample').addEventListener('change', function(){ var c=C.filter(function(x){return x.id===this.value;},this)[0]; if(c){ fill(c); check(); } });
+  $('clear').addEventListener('click', function(){ $('form').reset(); $('sample').value=''; vcard(); channelUI(); $('err').textContent=''; renderEmpty(); });
+
+  function read(){
+    return { vendor: byId[vs.value]||null, channel:$('channel').value, sender:$('channel').value==='email'?$('sender').value:'',
+      phoneInMessage:$('phone').value, text:$('text').value, bankName:$('bank').value, country:$('country').value,
+      bik:$('bik').value, account:$('account').value, recipientInn:$('inn').value, amount:$('amount').value };
+  }
+
+  var last=null;
+  function check(){
+    var q=read();
+    var hasDetails = (q.account||'').trim() || (q.bik||'').trim();
+    if(!hasDetails && !(q.text||'').trim()){ $('err').textContent='Заполните хотя бы текст запроса или новые реквизиты — без них проверять нечего.'; return; }
+    if(q.text.length>20000){ $('err').textContent='Текст длиннее 20 000 символов: вставьте только само письмо, без пересланной переписки.'; return; }
+    $('err').textContent='';
+    var r=RK.analyze(q); last={q:q,r:r}; render(q,r);
+  }
+  $('form').addEventListener('submit', function(e){ e.preventDefault(); check(); });
+
+  function renderEmpty(){ $('result').innerHTML='<h2>Заключение</h2><p class="muted">Заполните форму или выберите пример, затем нажмите «Проверить запрос».</p>'; }
+
+  var CHECK=[
+    'Позвонил по номеру из справочника, а не из письма или звонка',
+    'Собеседник сам назвал получателя, банк и последние 4 цифры счёта — совпало',
+    'ИНН получателя совпадает с ИНН контрагента',
+    'Крупный платёж согласован вторым сотрудником (руководителем)'
+  ];
+  function render(q,r){
+    var pos=Math.min(r.score,100);
+    var h='<h2>Заключение</h2><div class="verdict '+r.level.id+'"><div class="vhead"><span class="vname">'+r.level.name+'</span><span class="score">'+r.score+' <small>баллов</small></span></div>'+
+      '<div class="scale" role="img" aria-label="Шкала риска, '+r.score+' из 100"><span class="pin" style="left:'+pos+'%"></span></div>'+
+      '<div class="ticks"><span style="left:0">0</span><span style="left:25%">25</span><span style="left:50%">50</span><span>100+</span></div>'+
+      '<p class="action">'+esc(r.level.action)+'</p></div>';
+    if(r.flags.length){
+      h+='<ul class="flags">'+r.flags.map(function(f){return '<li><span class="pts'+(f.pts<20?' s':'')+'">+'+f.pts+'</span><div><div class="ftitle">'+esc(f.title)+'</div><div class="fdet">'+esc(f.detail)+'</div>'+(f.src?'<div class="src">Основание: '+esc(f.src)+'</div>':'')+'</div></li>';}).join('')+'</ul>';
+    } else h+='<p class="muted" style="margin-top:12px">Красных флагов не найдено.</p>';
+    if(r.info.length) h+='<ul class="notes">'+r.info.map(function(i){return '<li>'+esc(i)+'</li>';}).join('')+'</ul>';
+    h+='<div class="check"><h3>Обратный звонок перед оплатой</h3>'+CHECK.map(function(t,i){return '<label><input type="checkbox" id="cb'+i+'"> '+esc(t)+'</label>';}).join('')+
+      '<div class="decide"><button type="button" class="hold" data-d="Приостановлено">Приостановить оплату</button><button type="button" class="okb" data-d="Подтверждено" id="okbtn">Реквизиты подтверждены</button><button type="button" class="rej" data-d="Отклонено">Отклонить запрос</button><button type="button" id="copy">Скопировать заключение</button></div>'+
+      '<div class="toast" id="toast"></div></div><div class="log" id="log"></div>';
+    $('result').innerHTML=h;
+    $('result').querySelectorAll('.decide button[data-d]').forEach(function(b){ b.addEventListener('click', function(){ decide(b.dataset.d); }); });
+    $('copy').addEventListener('click', copy);
+    renderLog();
+  }
+
+  // --- журнал решений
+  var LOG=[]; try{ LOG=JSON.parse(localStorage.getItem('rk-log')||'[]'); }catch(e){ LOG=[]; }
+  function decide(d){
+    if(!last) return;
+    var done=CHECK.map(function(_,i){ var el=$('cb'+i); return el&&el.checked; });
+    if(d==='Подтверждено' && !(done[0]&&done[1])){ $('toast').textContent='Чтобы подтвердить реквизиты, отметьте звонок по номеру из справочника и совпадение реквизитов.'; return; }
+    if(d==='Подтверждено' && last.r.level.id==='high' && !done[3]){ $('toast').textContent='При высоком риске нужно второе согласование: отметьте последний пункт.'; return; }
+    var v=last.q.vendor;
+    LOG.unshift({t:new Date().toLocaleString('ru-RU'), who:v?v.name:'нет в справочнике', score:last.r.score, level:last.r.level.name, d:d});
+    LOG=LOG.slice(0,20); try{ localStorage.setItem('rk-log', JSON.stringify(LOG)); }catch(e){}
+    $('toast').textContent='Решение записано в журнал: '+d.toLowerCase()+'.';
+    renderLog();
+  }
+  function renderLog(){
+    var el=$('log'); if(!el) return;
+    el.innerHTML = LOG.length ? '<h3 style="font-size:.95rem;margin:16px 0 6px">Журнал решений (в этом браузере)</h3><table>'+LOG.map(function(x){return '<tr><td class="muted">'+esc(x.t)+'</td><td>'+esc(x.who)+'</td><td class="mono">'+x.score+'</td><td>'+esc(x.d)+'</td></tr>';}).join('')+'</table>' : '';
+  }
+  function copy(){
+    if(!last) return;
+    var q=last.q, r=last.r, v=q.vendor;
+    var txt='Проверка запроса на смену реквизитов\nКонтрагент: '+(v?v.name:'нет в справочнике')+'\nКанал: '+CH[q.channel]+'\nОценка: '+r.score+' баллов — '+r.level.name+'\nДействие: '+r.level.action+'\nПризнаки:\n'+(r.flags.map(function(f){return ' +'+f.pts+' '+f.title+' — '+f.detail;}).join('\n')||' нет');
+    var done=function(){ $('toast').textContent='Заключение скопировано.'; };
+    try{ navigator.clipboard.writeText(txt).then(done,function(){ fallback(txt); }); }catch(e){ fallback(txt); }
+  }
+  function fallback(txt){
+    var ta=document.createElement('textarea'); ta.value=txt; ta.setAttribute('readonly',''); ta.style.marginTop='8px'; ta.style.minHeight='140px';
+    $('toast').textContent='Скопировать автоматически не получилось — выделите текст ниже и скопируйте вручную.'; $('toast').after(ta); ta.select();
+  }
+
+  // --- тестовый набор
+  function runTests(){
+    var thr=+$('thr').value; $('thrv').textContent=thr;
+    var rows=C.map(function(c){ var r=RK.analyze(Object.assign({},c,{vendor:byId[c.vendorId]||null})); var sus=r.score>=thr; return {c:c,r:r,sus:sus,ok:sus===(c.label==='fraud')}; });
+    var tp=rows.filter(function(x){return x.c.label==='fraud'&&x.sus;}).length, fn=15-tp;
+    var fp=rows.filter(function(x){return x.c.label==='legit'&&x.sus;}).length, tn=15-fp;
+    var rec=tp/15, fpr=fp/15, acc=(tp+tn)/30;
+    var avg=rows.filter(function(x){return x.c.label==='fraud';}).reduce(function(s,x){return s+x.r.score;},0)/15;
+    $('tiles').innerHTML=
+      tile('Полнота', Math.round(rec*100)+'%', rec>=0.9?'<span class="pass">цель ≥ 90% выполнена</span>':'<span class="fail">цель ≥ 90% не выполнена</span>', tp+' из 15 мошеннических')+
+      tile('Ложные тревоги', Math.round(fpr*100)+'%', fpr<=0.2?'<span class="pass">цель ≤ 20% выполнена</span>':'<span class="fail">цель ≤ 20% не выполнена</span>', fp+' из 15 законных')+
+      tile('Верных решений', Math.round(acc*100)+'%', '', (tp+tn)+' из 30 запросов')+
+      tile('Средний балл мошенничества', Math.round(avg), '', 'у законных — '+Math.round(rows.filter(function(x){return x.c.label==='legit';}).reduce(function(s,x){return s+x.r.score;},0)/15));
+    $('cm').innerHTML='<div class="h"></div><div class="h">Инструмент: подозрительно</div><div class="h">Инструмент: в порядке</div>'+
+      '<div class="h">На самом деле мошенничество</div><div class="g">'+tp+'</div><div class="b">'+fn+'</div>'+
+      '<div class="h">На самом деле законно</div><div class="b">'+fp+'</div><div class="g">'+tn+'</div>';
+    $('rows').innerHTML=rows.map(function(x){
+      var lvl = x.r.score>=50?'high':x.sus?'mid':'low';
+      var lname = lvl==='high'?'Высокий':lvl==='mid'?'Проверить':'Низкий';
+      return '<tr><td class="mono"><button type="button" class="linkbtn" data-open="'+x.c.id+'">'+x.c.id+'</button></td><td>'+esc(x.c.title)+'<div class="muted" style="font-size:.8rem">'+CH[x.c.channel]+(x.c.amount?' · '+fmtMoney(x.c.amount):'')+'</div></td>'+
+        '<td><span class="pill '+x.c.label+'">'+(x.c.label==='fraud'?'мошенничество':'законно')+'</span></td><td class="num">'+x.r.score+'</td>'+
+        '<td><span class="pill '+lvl+'">'+lname+'</span></td><td class="'+(x.ok?'pass':'fail')+'">'+(x.ok?'верно':'ошибка')+'</td><td class="muted" style="font-size:.84rem">'+esc(x.c.why)+'</td></tr>';
+    }).join('');
+    $('rows').querySelectorAll('[data-open]').forEach(function(b){ b.addEventListener('click', function(){ var c=C.filter(function(y){return y.id===b.dataset.open;})[0]; $('sample').value=c.id; fill(c); location.hash='#check'; check(); }); });
+  }
+  function tile(k,v,t,sub){ return '<div class="tile"><div class="k">'+k+'</div><div class="v">'+v+'</div><div class="t muted">'+sub+'</div>'+(t?'<div class="t">'+t+'</div>':'')+'</div>'; }
+  $('thr').addEventListener('input', runTests);
+
+  // --- справочник и правила
+  $('vrows').innerHTML=V.map(function(v){return '<tr><td>'+esc(v.name)+'<div class="muted" style="font-size:.8rem">'+esc(v.what)+'</div></td><td class="mono">'+v.inn+'</td><td class="mono">'+esc(v.email||('*@'+v.domain))+'</td><td class="mono">'+esc(v.phone)+'</td><td>'+esc(v.bankName)+'</td><td class="mono">'+v.bik+'</td><td class="mono">'+v.account+'</td></tr>';}).join('');
+  var RULES=[['Домен-двойник или буквы другого алфавита в адресе',40],['ИНН получателя не совпадает с ИНН контрагента',30],['Бесплатная почта или чужой домен у корпоративного контрагента',30],['Ящик ИП не совпадает со справочником',30],['Просьба о секретности или запрет звонить',25],['Контрольный ключ счёта не сходится с БИК',25],['Счёт физического лица (408…)',25],['Неверный формат счёта',25],['Получателя нет в справочнике',20],['Банк за рубежом',20],['Звонок не с номера из справочника',20],['Оплата на счёт представителя или на карту',20],['Новый номер телефона для связи',15],['БИК неверного формата',15],['Давление сроком',10],['Типичная легенда: арест, проверка, санкции, смена банка',10],['Запрос в мессенджере',10],['ИНН не проходит контрольную сумму',10]];
+  $('rules').innerHTML=RULES.map(function(r){return '<tr><td>'+r[0]+'</td><td class="num">+'+r[1]+'</td></tr>';}).join('');
+
+  // --- старт: рабочее состояние на примере
+  var start=C.filter(function(c){return c.id==='T09';})[0];
+  $('sample').value=start.id; fill(start); check();
+  show();
+})();
+</script>
